@@ -236,18 +236,27 @@
         <tr><td>Рекуператор + барабан</td><td>1,0 т/ч</td><td>кислотный дренаж управляем</td><td class="good">рекомендуется</td></tr>
         <tr><td>Лопастная контактная</td><td>1,0 т/ч</td><td>CAPEX 75–90 млн ₽</td><td class="warn">резерв на будущее</td></tr>`;
     }
-    function drawBarChart(id,labels,values,color){
+    function drawBarChart(id,labels,values,color,unit){
       const c=document.getElementById(id),ctx=c.getContext('2d'),w=c.width=c.clientWidth*devicePixelRatio,h=c.height=c.clientHeight*devicePixelRatio; ctx.scale(devicePixelRatio,devicePixelRatio);
-      const W=c.clientWidth,H=c.clientHeight,isMobile=W<520; ctx.clearRect(0,0,W,H); ctx.strokeStyle='rgba(255,255,255,.16)'; ctx.fillStyle='#9eb3ca'; ctx.font=(isMobile?'10px':'12px')+' Arial';
-      const min=Math.min(0,...values),max=Math.max(...values),pad=34,plotH=H-64,barW=(W-70)/values.length*.65;
-      values.forEach((v,i)=>{const x=48+i*(W-70)/values.length, y=pad+(max-v)/(max-min)*plotH, y0=pad+(max-0)/(max-min)*plotH; ctx.fillStyle=v>=0?color:'#ff6b6b'; ctx.fillRect(x,Math.min(y,y0),barW,Math.abs(y0-y)); ctx.fillStyle='#cfe2f5'; ctx.textAlign=isMobile?'center':'left'; ctx.fillText(labels[i],x+(isMobile?barW/2:0),H-18)});
-      ctx.strokeStyle='rgba(255,255,255,.3)'; const y0=pad+(max-0)/(max-min)*plotH; ctx.beginPath(); ctx.moveTo(42,y0); ctx.lineTo(W-16,y0); ctx.stroke();
+      const W=c.clientWidth,H=c.clientHeight,isMobile=W<520; ctx.clearRect(0,0,W,H); ctx.font=(isMobile?'10px':'12px')+' Arial';
+      const rawMin=Math.min(0,...values), rawMax=Math.max(0,...values), range=Math.max(1,rawMax-rawMin), min=rawMin-range*.12, max=rawMax+range*.12;
+      const left=isMobile?48:54, right=12, top=26, bottom=40, plotH=H-top-bottom, plotW=W-left-right, barW=plotW/values.length*.58;
+      ctx.fillStyle='#cfe2f5'; ctx.textAlign='left'; ctx.fillText(unit,left,14);
+      for(let k=0;k<=4;k++){
+        const val=min+(max-min)*k/4, y=top+(max-val)/(max-min)*plotH;
+        ctx.strokeStyle='rgba(158,179,202,.28)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(left,y); ctx.lineTo(W-right,y); ctx.stroke();
+        ctx.fillStyle='#b8c8d9'; ctx.textAlign='right'; ctx.fillText(val.toFixed(1),left-7,y+4);
+      }
+      ctx.strokeStyle='rgba(207,226,245,.62)'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(left,top); ctx.lineTo(left,H-bottom); ctx.lineTo(W-right,H-bottom); ctx.stroke();
+      const y0=top+(max-0)/(max-min)*plotH;
+      ctx.strokeStyle='rgba(255,255,255,.58)'; ctx.beginPath(); ctx.moveTo(left,y0); ctx.lineTo(W-right,y0); ctx.stroke();
+      values.forEach((v,i)=>{const x=left+(i+.5)*plotW/values.length-barW/2, y=top+(max-v)/(max-min)*plotH; ctx.fillStyle=v>=0?color:'#ff6b6b'; ctx.fillRect(x,Math.min(y,y0),barW,Math.abs(y0-y)); ctx.fillStyle='#edf5ff'; ctx.textAlign='center'; ctx.fillText(v.toFixed(1),x+barW/2,Math.min(y,y0)-6); ctx.fillStyle='#cfe2f5'; ctx.fillText(labels[i],x+barW/2,H-15)});
     }
-    function drawCash(cash){drawBarChart('cash',cash.map((_,i)=>i?'Y'+i:'0'),cash.map(x=>+x.toFixed(1)),'#58e08f')}
+    function drawCash(cash){drawBarChart('cash',cash.map((_,i)=>i?'Y'+i:'0'),cash.map(x=>+x.toFixed(1)),'#58e08f','млн ₽')}
     function scenario(over){const old={...p}; Object.assign(p,over); const v=calc().pp; p=old; return v}
     function drawSens(){
       const mobile=window.innerWidth<=720;
-      drawBarChart('sens',mobile?['База','Цена','CAPEX','Э/э','Догр.','Рекуп.']:['База','Цена -10','CAPEX +20','Э/э 10','Без догр','2 рекуп'],[calc().pp,scenario({price:p.price*.9}),scenario({capex:p.capex*1.2}),scenario({eprice:10}),scenario({heatMWh:0}),scenario({heatMWh:0,capexExtra:4.5})].map(x=>+x.toFixed(2)),'#43d9ff')
+      drawBarChart('sens',mobile?['База','Цена','CAPEX','Э/э','Догр.','Рекуп.']:['База','Цена -10','CAPEX +20','Э/э 10','Без догр','2 рекуп'],[calc().pp,scenario({price:p.price*.9}),scenario({capex:p.capex*1.2}),scenario({eprice:10}),scenario({heatMWh:0}),scenario({heatMWh:0,capexExtra:4.5})].map(x=>+x.toFixed(2)),'#43d9ff','лет')
     }
     function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
     function updateViz(r){
@@ -275,11 +284,14 @@
       const sync=()=>{viz.style.setProperty('--rx',rx.value+'deg'); viz.style.setProperty('--ry',ry.value+'deg'); drawWire3D(calc())};
       rx.oninput=sync; ry.oninput=sync; rz.oninput=sync; zoom.oninput=sync; sync();
       document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{vizMode=b.dataset.mode; viz.classList.remove('mode-real','mode-standard','mode-simple'); viz.classList.add('mode-'+vizMode); document.querySelectorAll('[data-mode]').forEach(x=>x.classList.toggle('on',x===b)); drawWire3D(calc()); if(window.updateReal3D) window.updateReal3D(p,calc())});
-      let drag=false,lastX=0,lastY=0;
+      let drag=false,lastX=0,lastY=0,lastPinch=0;
       const useFallbackControls=e=>vizMode!=='real' || e.target.closest('.wireCanvas');
-      viz.addEventListener('pointerdown',e=>{if(!useFallbackControls(e))return; drag=true;lastX=e.clientX;lastY=e.clientY;viz.setPointerCapture(e.pointerId)});
-      viz.addEventListener('pointermove',e=>{if(!drag||vizMode==='real')return; const dx=e.clientX-lastX,dy=e.clientY-lastY; lastX=e.clientX; lastY=e.clientY; ry.value=clamp(+ry.value+dx*.35,-70,45); rx.value=clamp(+rx.value-dy*.35,25,78); sync()});
-      viz.addEventListener('pointerup',()=>drag=false); viz.addEventListener('pointercancel',()=>drag=false);
+      const activeTouches=new Map();
+      const pinchDistance=()=>{const pts=[...activeTouches.values()]; if(pts.length<2)return 0; return Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y)};
+      viz.addEventListener('pointerdown',e=>{if(!useFallbackControls(e))return; if(e.pointerType==='touch')activeTouches.set(e.pointerId,{x:e.clientX,y:e.clientY}); if(activeTouches.size>=2){lastPinch=pinchDistance();drag=false}else{drag=true;lastX=e.clientX;lastY=e.clientY} viz.setPointerCapture(e.pointerId)});
+      viz.addEventListener('pointermove',e=>{if(vizMode==='real')return; if(e.pointerType==='touch'&&activeTouches.has(e.pointerId))activeTouches.set(e.pointerId,{x:e.clientX,y:e.clientY}); if(activeTouches.size>=2){const d=pinchDistance(); if(lastPinch){zoom.value=clamp(+zoom.value+(d-lastPinch)*.25,70,150); sync()} lastPinch=d; return} if(!drag)return; const dx=e.clientX-lastX,dy=e.clientY-lastY; lastX=e.clientX; lastY=e.clientY; ry.value=clamp(+ry.value+dx*.35,-70,45); rx.value=clamp(+rx.value-dy*.35,25,78); sync()});
+      const endTouch=e=>{activeTouches.delete(e.pointerId); if(activeTouches.size<2)lastPinch=0; drag=false};
+      viz.addEventListener('pointerup',endTouch); viz.addEventListener('pointercancel',endTouch);
       viz.addEventListener('wheel',e=>{if(vizMode==='real')return; e.preventDefault(); zoom.value=clamp(+zoom.value-(e.deltaY>0?5:-5),70,150); sync()},{passive:false});
       const map=[['showCut','hide-cut'],['showAir','hide-air'],['showGas','hide-gas'],['showMaterial','hide-material']];
       map.forEach(([id,cls])=>document.getElementById(id).onchange=e=>{viz.classList.toggle(cls,!e.target.checked); drawWire3D(calc())});
@@ -303,11 +315,10 @@
         let q=pr(p), mobile=window.innerWidth<=720;
         ctx.font=(mobile?'11px':'12px')+' Arial';
         let tw=ctx.measureText(text).width+14, left=q[0]-tw/2, right=q[0]+tw/2, top=q[1]-28, bottom=q[1]-6;
-        if(mobile && (left<8 || right>W-8 || top<52 || bottom>H-58)) return;
         ctx.fillStyle='rgba(5,10,18,.78)'; ctx.strokeStyle=col; ctx.lineWidth=1; ctx.beginPath(); ctx.roundRect(left,top,tw,22,8); ctx.fill(); ctx.stroke(); ctx.fillStyle=col; ctx.textAlign='center'; ctx.fillText(text,q[0],q[1]-13)
       }
       function arrow(a,b,col){line(a,b,col,2.2); let A=pr(a),B=pr(b),ang=Math.atan2(B[1]-A[1],B[0]-A[0]); ctx.fillStyle=col; ctx.beginPath(); ctx.moveTo(B[0],B[1]); ctx.lineTo(B[0]-11*Math.cos(ang-.45),B[1]-11*Math.sin(ang-.45)); ctx.lineTo(B[0]-11*Math.cos(ang+.45),B[1]-11*Math.sin(ang+.45)); ctx.closePath(); ctx.fill()}
-      function grid(){ctx.strokeStyle='rgba(255,255,255,.06)'; ctx.lineWidth=1; for(let i=0;i<9;i++){let y=H*.18+i*34; ctx.beginPath(); ctx.moveTo(24,y); ctx.lineTo(W-24,y); ctx.stroke()}}
+      function grid(){}
       const wet=clamp((p.w1-28)/7,0,1), heat=clamp(p.heatMWh/1500,0,1), load=clamp(p.Gp/1500,.25,1);
       if(vizMode==='real'){
         // реалистичный основной режим: объёмные аппараты с техническими линиями
@@ -505,7 +516,14 @@
     function tick(){
       controls.update();
       drum.rotation.x += .006; clay.rotation.x += .009; innerAir.rotation.x += .012;
-      labels.forEach(l=>{const v=l.pos.clone().project(camera); const x=(v.x*.5+.5)*host.clientWidth, y=(-v.y*.5+.5)*host.clientHeight; l.div.style.transform=`translate(-50%,-50%) translate(${x}px,${y}px)`; l.div.style.display=v.z<1?'block':'none'});
+      // Подписи DOM принадлежат только объёмной Three.js-модели.
+      // В canvas-режимах остаются только подписи соответствующей схемы.
+      labels.forEach(l=>{
+        const v=l.pos.clone().project(camera);
+        const x=(v.x*.5+.5)*host.clientWidth, y=(-v.y*.5+.5)*host.clientHeight;
+        l.div.style.transform=`translate(-50%,-50%) translate(${x}px,${y}px)`;
+        l.div.style.display=(vizMode==='real' && v.z<1)?'block':'none';
+      });
       renderer.render(scene,camera); requestAnimationFrame(tick);
     }
     window.updateReal3D(...Object.values(window.getSeveralmazState()).slice(0,2));
